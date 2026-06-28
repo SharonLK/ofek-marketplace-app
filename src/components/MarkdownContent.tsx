@@ -5,10 +5,21 @@ interface MarkdownContentProps {
 }
 
 function renderMarkdown(md: string): string {
+  const codeBlocks: string[] = []
+
   let html = md
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
+
+  html = html.replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
+    const idx = codeBlocks.length
+    const langClass = lang ? ` class="language-${lang}"` : ''
+    codeBlocks.push(
+      `<pre class="bg-neutral-800 rounded-lg p-4 my-3 overflow-x-auto text-sm"><code${langClass}>${code.trim()}</code></pre>`,
+    )
+    return `\x00CODEBLOCK${idx}\x00`
+  })
 
   html = html.replace(/^### (.+)$/gm, '<h3 class="text-lg font-semibold text-neutral-200 mt-4 mb-2">$1</h3>')
   html = html.replace(/^## (.+)$/gm, '<h2 class="text-xl font-semibold text-neutral-200 mt-6 mb-2">$1</h2>')
@@ -20,7 +31,11 @@ function renderMarkdown(md: string): string {
   html = html.replace(/\n\n/g, '</p><p class="text-neutral-300 mb-2">')
   html = html.replace(/\n/g, '<br/>')
 
-  return `<p class="text-neutral-300 mb-2">${html}</p>`
+  html = `<p class="text-neutral-300 mb-2">${html}</p>`
+
+  html = html.replace(/\x00CODEBLOCK(\d+)\x00/g, (_, idx) => codeBlocks[Number(idx)])
+
+  return html
 }
 
 export default function MarkdownContent({ content }: MarkdownContentProps) {

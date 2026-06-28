@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import type { PluginItem, PluginType } from '../types'
+import MarkdownContent from './MarkdownContent'
+import { fetchFileContent } from '../api/github'
 
 const RAW_BASE = 'https://raw.githubusercontent.com/SharonLK/ofek-marketplace/main'
 const LOCAL_BASE = '.opencode'
@@ -41,6 +43,33 @@ function buildInstallCommand(entry: FileEntry, plugin: PluginItem, targetBase: s
 
 export default function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
   const [copiedIdx, setCopiedIdx] = useState<string | null>(null)
+  const [expandedMap, setExpandedMap] = useState<Record<string, boolean>>({})
+  const [contentMap, setContentMap] = useState<Record<string, string>>({})
+  const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
+
+  const toggleExpand = async (key: string, entry: FileEntry) => {
+    if (expandedMap[key]) {
+      setExpandedMap((prev) => ({ ...prev, [key]: false }))
+      return
+    }
+
+    setExpandedMap((prev) => ({ ...prev, [key]: true }))
+
+    if (!contentMap[key]) {
+      setLoadingMap((prev) => ({ ...prev, [key]: true }))
+      try {
+        const cfg = TYPE_CONFIG[entry.type]
+        const relDir = cfg.dir.replace('.opencode/', '')
+        const filePath = `${relDir}/${entry.name}/${cfg.ext}`
+        const content = await fetchFileContent(plugin.path, filePath)
+        setContentMap((prev) => ({ ...prev, [key]: content }))
+      } catch {
+        setContentMap((prev) => ({ ...prev, [key]: 'Error loading content' }))
+      } finally {
+        setLoadingMap((prev) => ({ ...prev, [key]: false }))
+      }
+    }
+  }
 
   const entries: FileEntry[] = []
   for (const t of plugin.types) {
@@ -129,12 +158,10 @@ export default function PluginDetailModal({ plugin, onClose }: PluginDetailModal
                     const globalKey = `${idx}-global`
                     const localCommand = buildInstallCommand(entry, plugin, LOCAL_BASE)
                     const globalCommand = buildInstallCommand(entry, plugin, GLOBAL_BASE)
+                    const entryKey = `${entry.type}-${entry.name}`
                     return (
-                      <div
-                        key={`${entry.type}-${entry.name}`}
-                        className="bg-black rounded-lg border border-neutral-800 p-4"
-                      >
-                        <div>
+                      <div key={entryKey} className="space-y-3">
+                        <div className="bg-black rounded-lg border border-neutral-800 p-4">
                           <div className="text-xs text-neutral-500 font-medium mb-1">
                             Local project install <span className="text-neutral-400">— {entry.name}</span>
                           </div>
@@ -151,9 +178,7 @@ export default function PluginDetailModal({ plugin, onClose }: PluginDetailModal
                           </div>
                         </div>
 
-                        <hr className="border-neutral-700 my-4" />
-
-                        <div>
+                        <div className="bg-black rounded-lg border border-neutral-800 p-4">
                           <div className="text-xs text-neutral-500 font-medium mb-1">
                             Global (user-wide) install
                           </div>
@@ -168,6 +193,30 @@ export default function PluginDetailModal({ plugin, onClose }: PluginDetailModal
                               {copiedIdx === globalKey ? 'Copied!' : 'Copy Global'}
                             </button>
                           </div>
+                        </div>
+
+                        <div className="bg-black rounded-lg border border-neutral-800">
+                          <button
+                            onClick={() => toggleExpand(entryKey, entry)}
+                            className="w-full flex items-center gap-1.5 p-4 text-xs text-neutral-500 hover:text-neutral-300 transition-colors"
+                          >
+                            <span className="text-xs">
+                              {expandedMap[entryKey] ? '\u25BC' : '\u25B6'}
+                            </span>
+                            {expandedMap[entryKey] ? 'Hide details' : 'Show details'}
+                          </button>
+                          {expandedMap[entryKey] && (
+                            <div className="px-4 pb-4 pt-3 border-t border-neutral-700">
+                              {loadingMap[entryKey] ? (
+                                <div className="flex items-center py-4">
+                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-cyan-500" />
+                                  <span className="ml-2 text-sm text-neutral-500">Loading...</span>
+                                </div>
+                              ) : (
+                                <MarkdownContent content={contentMap[entryKey] || ''} />
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )

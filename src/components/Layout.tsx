@@ -19,12 +19,7 @@ export default function Layout() {
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-6">
         <Outlet />
       </main>
-      <footer className="border-t border-neutral-800 px-4 py-3 text-center text-xs text-neutral-600">
-        Powered by{' '}
-        <a href="https://github.com/SharonLK/ofek-marketplace" className="text-cyan-500 hover:underline">
-          ofek-marketplace
-        </a>
-      </footer>
+
     </div>
   )
 }
