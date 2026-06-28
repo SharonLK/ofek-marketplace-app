@@ -2,6 +2,8 @@ import { useState } from 'react'
 import type { PluginItem, PluginType } from '../types'
 
 const RAW_BASE = 'https://raw.githubusercontent.com/SharonLK/ofek-marketplace/main'
+const LOCAL_BASE = '.opencode'
+const GLOBAL_BASE = '~/.config/opencode'
 
 const TYPE_CONFIG: Record<PluginType, { label: string; dir: string; ext: string; color: string }> = {
   skill: { label: 'Skills', dir: '.opencode/skills', ext: 'SKILL.md', color: 'bg-emerald-600' },
@@ -27,16 +29,18 @@ function getPluginPrefix(plugin: PluginItem): string {
   return `units/${plugin.hierarchy}/plugins/${plugin.dirName}`
 }
 
-function buildInstallCommand(entry: FileEntry, plugin: PluginItem): string {
+function buildInstallCommand(entry: FileEntry, plugin: PluginItem, targetBase: string): string {
   const cfg = TYPE_CONFIG[entry.type]
   const prefix = getPluginPrefix(plugin)
-  const url = `${RAW_BASE}/${prefix}/${cfg.dir.replace('.opencode/', '')}/${entry.name}/${cfg.ext}`
-  const targetPath = `${cfg.dir}/${entry.name}/${cfg.ext}`
-  return `mkdir -p ${cfg.dir}/${entry.name}\ncurl -o ${targetPath} ${url}`
+  const relDir = cfg.dir.replace('.opencode/', '')
+  const url = `${RAW_BASE}/${prefix}/${relDir}/${entry.name}/${cfg.ext}`
+  const installDir = `${targetBase}/${relDir}/${entry.name}`
+  const installPath = `${installDir}/${cfg.ext}`
+  return `mkdir -p ${installDir}\ncurl -o ${installPath} ${url}`
 }
 
 export default function PluginDetailModal({ plugin, onClose }: PluginDetailModalProps) {
-  const [copiedIdx, setCopiedIdx] = useState<number | null>(null)
+  const [copiedIdx, setCopiedIdx] = useState<string | null>(null)
 
   const entries: FileEntry[] = []
   for (const t of plugin.types) {
@@ -53,9 +57,9 @@ export default function PluginDetailModal({ plugin, onClose }: PluginDetailModal
     }
   }
 
-  const handleCopy = (idx: number, command: string) => {
+  const handleCopy = (key: string, command: string) => {
     navigator.clipboard.writeText(command).then(() => {
-      setCopiedIdx(idx)
+      setCopiedIdx(key)
       setTimeout(() => setCopiedIdx(null), 2000)
     })
   }
@@ -121,30 +125,49 @@ export default function PluginDetailModal({ plugin, onClose }: PluginDetailModal
                 <div className="space-y-3">
                   {typeEntries.map((entry) => {
                     const idx = entries.indexOf(entry)
-                    const command = buildInstallCommand(entry, plugin)
+                    const localKey = `${idx}-local`
+                    const globalKey = `${idx}-global`
+                    const localCommand = buildInstallCommand(entry, plugin, LOCAL_BASE)
+                    const globalCommand = buildInstallCommand(entry, plugin, GLOBAL_BASE)
                     return (
                       <div
                         key={`${entry.type}-${entry.name}`}
                         className="bg-black rounded-lg border border-neutral-800 p-4"
                       >
-                        <div className="flex items-center gap-2 mb-2">
-                          <span
-                            className={`text-xs px-2 py-0.5 rounded-full text-white ${cfg.color}`}
-                          >
-                            {cfg.label}
-                          </span>
-                          <span className="text-sm text-neutral-300 font-mono">{entry.name}</span>
+                        <div>
+                          <div className="text-xs text-neutral-500 font-medium mb-1">
+                            Local project install <span className="text-neutral-400">— {entry.name}</span>
+                          </div>
+                          <pre className="text-sm text-cyan-400 font-mono whitespace-pre-wrap m-0 select-all">
+                            {localCommand}
+                          </pre>
+                          <div className="mt-1.5 flex justify-end">
+                            <button
+                              onClick={() => handleCopy(localKey, localCommand)}
+                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors"
+                            >
+                              {copiedIdx === localKey ? 'Copied!' : 'Copy Local'}
+                            </button>
+                          </div>
                         </div>
-                        <pre className="text-sm text-cyan-400 font-mono whitespace-pre-wrap m-0 select-all">
-                          {command}
-                        </pre>
-                        <div className="mt-2 flex justify-end">
-                          <button
-                            onClick={() => handleCopy(idx, command)}
-                            className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors"
-                          >
-                            {copiedIdx === idx ? 'Copied!' : 'Copy'}
-                          </button>
+
+                        <hr className="border-neutral-700 my-4" />
+
+                        <div>
+                          <div className="text-xs text-neutral-500 font-medium mb-1">
+                            Global (user-wide) install
+                          </div>
+                          <pre className="text-sm text-cyan-400 font-mono whitespace-pre-wrap m-0 select-all">
+                            {globalCommand}
+                          </pre>
+                          <div className="mt-1.5 flex justify-end">
+                            <button
+                              onClick={() => handleCopy(globalKey, globalCommand)}
+                              className="px-3 py-1.5 text-xs font-medium rounded-md bg-neutral-800 text-neutral-300 hover:bg-neutral-700 hover:text-white transition-colors"
+                            >
+                              {copiedIdx === globalKey ? 'Copied!' : 'Copy Global'}
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )
